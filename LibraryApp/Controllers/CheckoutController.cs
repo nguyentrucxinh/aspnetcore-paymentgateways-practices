@@ -59,16 +59,40 @@ namespace LibraryApp.Controllers
                 }
             };
 
-            Result<Transaction> result = gateway.Transaction.Sale(request);
+            var result = gateway.Transaction.Sale(request);
 
             if (result.IsSuccess())
             {
                 return View("Success");
             }
-            else
+            return View("Failure");
+        }
+
+        public IActionResult BraintreePlans()
+        {
+            var gateway = _braintreeService.GetGateway();
+            var plans = gateway.Plan.All();
+
+            return View(plans);
+        }
+
+        public IActionResult SubscribeToPlan(string id)
+        {
+            var gateway = _braintreeService.GetGateway();
+
+            var subscriptionRequest = new SubscriptionRequest()
             {
-                return View("Failure");
+                PaymentMethodToken = "my-payment-token-value",
+                PlanId = id,
+            };
+
+            var result = gateway.Subscription.Create(subscriptionRequest);
+
+            if (result.IsSuccess())
+            {
+                return View("Subscribed");
             }
+            return View("NotSubscribed");
         }
     }
 }
