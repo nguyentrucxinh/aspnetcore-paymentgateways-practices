@@ -22,6 +22,7 @@
                     <div id="bt-dropin"></div>
                 </div>
             </section>
+            @Html.HiddenFor(n => n.Nonce, new { @id = "nonce" })
             <hr />
             <button class="btn btn-success" type="submit"><span>Confirm payment - $@Model.Price</span></button>
         </form>
@@ -31,9 +32,22 @@
 <script src="https://js.braintreegateway.com/web/dropin/1.22.0/js/dropin.min.js"></script>
 <script>
     var client_token = "@ViewBag.ClientToken";
-    
+    var form = document.querySelector('#payment-form');
+
     braintree.dropin.create({
         authorization: client_token,
-        container: "#bt-dropin",
+        container: '#bt-dropin',
+    }, function (createErr, instance) {
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            instance.requestPaymentMethod(function (err, payload) {
+                if (err) {
+                    return;
+                }
+                document.querySelector('#nonce').value = payload.nonce;
+                form.submit();
+            });
+        });
     });
 </script>
