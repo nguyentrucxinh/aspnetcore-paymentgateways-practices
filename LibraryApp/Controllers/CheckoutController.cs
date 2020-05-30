@@ -2,22 +2,20 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Braintree;
 using LibraryApp.Data.Services;
 using LibraryApp.Data.ViewModels;
 using Microsoft.AspNetCore.Mvc;
+using Stripe;
 
 namespace LibraryApp.Controllers
 {
     public class CheckoutController : Controller
     {
         private readonly IBookService _bookService;
-        private readonly IBraintreeService _braintreeService;
 
-        public CheckoutController(IBookService courseService, IBraintreeService braintreeService)
+        public CheckoutController(IBookService courseService)
         {
             _bookService = courseService;
-            _braintreeService = braintreeService;
         }
 
         public IActionResult Purchase(Guid id)
@@ -26,9 +24,7 @@ namespace LibraryApp.Controllers
             var book = _bookService.GetById(id);
             if (book == null) return NotFound();
 
-            var gateway = _braintreeService.GetGateway();
-            var clientToken = gateway.ClientToken.Generate();
-            ViewBag.ClientToken = clientToken;
+            ViewBag.PurchaseAmount = book.Price;
 
             var data = new BookPurchaseVM
             {
@@ -44,51 +40,60 @@ namespace LibraryApp.Controllers
             return View(data);
         }
 
-        public IActionResult Create(BookPurchaseVM model)
+        [HttpPost]
+        public IActionResult Create(string stripeToken, Guid id)
         {
-            var gateway = _braintreeService.GetGateway();
-            var book = _bookService.GetById(model.Id);
+            var book = _bookService.GetById(id);
 
-            var request = new TransactionRequest
+            var chargeOptions = new ChargeCreateOptions()
             {
-                Amount = Convert.ToDecimal(book.Price),
-                PaymentMethodNonce = model.Nonce,
-                Options = new TransactionOptionsRequest
+                Amount = (long) (Convert.ToDouble(book.Price) * 100),
+                Currency = "usd",
+                Source = stripeToken,
+                Metadata = new Dictionary<string, string>()
                 {
-                    SubmitForSettlement = true
+                    { "BookId", book.Id.ToString() },
+                    { "BookName", book.Title },
+                    { "BookAuthor", book.Author },
                 }
             };
 
-            var result = gateway.Transaction.Sale(request);
+            var service = new ChargeService();
+            var charge = service.Create(chargeOptions);
 
-            if (result.IsSuccess())
+            if (charge.Status == "succeeded")
             {
                 return View("Success");
             }
             return View("Failure");
         }
 
-        public IActionResult BraintreePlans()
+        public IActionResult LoadAllPlans()
         {
-            var gateway = _braintreeService.GetGateway();
-            var plans = gateway.Plan.All();
+            var service = new PlanService();
+            var allPlans = service.List().ToList();
 
-            return View(plans);
+            return View(allPlans);
         }
 
         public IActionResult SubscribeToPlan(string id)
         {
-            var gateway = _braintreeService.GetGateway();
-
-            var subscriptionRequest = new SubscriptionRequest()
+            var subscriptionOptions = new SubscriptionCreateOptions
             {
-                PaymentMethodToken = "my-payment-token-value",
-                PlanId = id,
+                Customer = "cus_HN5xdKA9s9FDUl",
+                Items = new List<SubscriptionItemOptions>
+                {
+                    new SubscriptionItemOptions
+                    {
+                        Plan = id
+                    }
+                }
             };
 
-            var result = gateway.Subscription.Create(subscriptionRequest);
+            var service = new SubscriptionService();
+            var subscription = service.Create(subscriptionOptions);
 
-            if (result.IsSuccess())
+            if (subscription.Created != null)
             {
                 return View("Subscribed");
             }

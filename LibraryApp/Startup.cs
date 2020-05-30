@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Stripe;
 
 namespace LibraryApp
 {
@@ -20,6 +21,7 @@ namespace LibraryApp
         public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
+            StripeConfiguration.ApiKey = configuration.GetValue<string>("Stripe:SecretKey");
         }
 
         public IConfiguration Configuration { get; }
@@ -28,7 +30,6 @@ namespace LibraryApp
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddTransient<IBookService, BookService>();
-            services.AddTransient<IBraintreeService, BraintreeService>();
             services.AddDbContext<AppDbContext>(opt => opt.UseInMemoryDatabase(new Guid().ToString()));
             services.AddControllersWithViews();
         }
